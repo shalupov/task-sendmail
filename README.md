@@ -1,7 +1,7 @@
 task-sendmail
 =============
 
-Runs specified process and sends email notification with programs's output if exit code was not zero
+Runs specified process and sends email notification with program's output if exit code was not zero (Windows only)
 
 Usage: `task_sendmail.exe [--verbose] --config PATH_TO_CONFIG.ini PROGRAM_TO_RUN [arguments]`
 
