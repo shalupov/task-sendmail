@@ -6,6 +6,15 @@ using System.Text;
 namespace TaskSendMail {
   internal static class TaskSendMailProgram {
     public static int Main(string[] args) {
+      try {
+        return MainImpl(args);
+      } catch (Exception e) {
+        Console.Error.WriteLine(e);
+        return 254;
+      }
+    }
+
+    private static int MainImpl(string[] args) {
       if (args.Length == 0 || args[0] == "-h" || args[0] == "--help" || args[0] == "/?" || args[0] == "/h") {
         ShowHelpAndExit();
       }
@@ -35,6 +44,7 @@ namespace TaskSendMail {
 
       if (config == null) {
         ShowHelpAndExit("Config file name is missing");
+        Environment.Exit(1); // NOT-REACHED
       }
 
       if (i == args.Length) {
@@ -47,7 +57,8 @@ namespace TaskSendMail {
         ProcessUtil.AddQuoted(processArguments, args[i++]);
       }
 
-      var smtp = new SmtpMailSender(config);
+      var smtp = config.ReadBool("smtp", "enabled") ? new SmtpMailSender(config) : null;
+      var file = config.ReadBool("file", "enabled") ? new FileReports(config) : null;
 
       var stderr = new StringBuilder();
       var stdout = new StringBuilder();
@@ -65,8 +76,8 @@ namespace TaskSendMail {
           RedirectStandardError = true,
         },
       };
-      process.ErrorDataReceived += (o, eventArgs) => { stderr.Append(eventArgs.Data); };
-      process.OutputDataReceived += (o, eventArgs) => { stdout.Append(eventArgs.Data); };
+      process.ErrorDataReceived += (o, eventArgs) => { stderr.AppendLine(eventArgs.Data); };
+      process.OutputDataReceived += (o, eventArgs) => { stdout.AppendLine(eventArgs.Data); };
       process.Start();
       process.BeginErrorReadLine();
       process.BeginOutputReadLine();
@@ -78,16 +89,31 @@ namespace TaskSendMail {
       EnsureNewLineAtTheEnd(stderr);
       EnsureNewLineAtTheEnd(stdout);
 
+      string reportBody = $"STDOUT:{Environment.NewLine}{stdout}{Environment.NewLine}" +
+                          $"STDERR:{Environment.NewLine}{stderr}{Environment.NewLine}" +
+                          $"PROCESS RUN TIME: {processStopwatch.Elapsed.ToString(null, CultureInfo.InvariantCulture)}{Environment.NewLine}{Environment.NewLine}" +
+                          $"PROCESS EXIT TIME: {process.ExitTime.ToString(DateTimeFormatInfo.InvariantInfo)}{Environment.NewLine}{Environment.NewLine}" +
+                          $"PROCESS EXIT CODE: {process.ExitCode}{Environment.NewLine}{Environment.NewLine}";
+
+      if (file != null) {
+        var sb = new StringBuilder();
+        sb.Append("Process: ");
+        ProcessUtil.AddQuoted(sb, processToRun);
+        sb.Append(" ");
+        sb.Append(processArguments);
+        sb.AppendLine();
+        sb.AppendLine();
+        sb.Append(reportBody);
+        
+        file.SaveReport(process.ExitCode == 0, sb.ToString());
+      }
+
       if (process.ExitCode != 0) {
         SendMail(
           smtp,
           process.ExitCode,
           process.StartInfo.FileName,
-          $"STDOUT:{Environment.NewLine}{stdout}{Environment.NewLine}" +
-          $"STDERR:{Environment.NewLine}{stderr}{Environment.NewLine}" +
-          $"PROCESS RUN TIME: {processStopwatch.Elapsed.ToString(null, CultureInfo.InvariantCulture)}{Environment.NewLine}{Environment.NewLine}" +
-          $"PROCESS EXIT TIME: {process.ExitTime.ToString(DateTimeFormatInfo.InvariantInfo)}{Environment.NewLine}{Environment.NewLine}" +
-          $"PROCESS EXIT CODE: {process.ExitCode}{Environment.NewLine}{Environment.NewLine}"
+          reportBody
         );
       }
 
@@ -110,6 +136,7 @@ namespace TaskSendMail {
       Console.Error.WriteLine();
       Console.Error.WriteLine("Config file should be in the format of .ini file, example:");
       Console.Error.WriteLine("  [smtp]");
+      Console.Error.WriteLine("  enabled = true");
       Console.Error.WriteLine("  host = smtp.gmail.com");
       Console.Error.WriteLine("  port = 465");
       Console.Error.WriteLine("  user = me@gmail.com");
@@ -117,6 +144,9 @@ namespace TaskSendMail {
       Console.Error.WriteLine("  StartTLS = true");
       Console.Error.WriteLine("  from = me@gmail.com");
       Console.Error.WriteLine("  to = me@gmail.com");
+      Console.Error.WriteLine("  [file]");
+      Console.Error.WriteLine("  enabled = true");
+      Console.Error.WriteLine("  dir = C:\\my\\dir");
       Console.Error.WriteLine();
       Console.Error.WriteLine("NOTE: task_sendmail supports only unencrypted SMTP connections or SMTP with StartTLS");
       Console.Error.WriteLine("See https://sendgrid.com/blog/what-is-starttls for explanation");
@@ -125,6 +155,11 @@ namespace TaskSendMail {
     }
 
     private static void SendMail(SmtpMailSender sender, int exitCode, string program, string body) {
+      if (sender == null) {
+        Logging.Debug("Sending e-mail is disabled");
+        return;
+      }
+
       sender.SendMail($"[task-sendmail] Program '{program}' execution failure: exit code {exitCode}", body);
     }
   }

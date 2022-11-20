@@ -9,6 +9,7 @@ Config file should be in the format of .ini file, example:
 
 ```
 [smtp]
+enabled = true
 host = smtp.gmail.com
 port = 465
 user = me@gmail.com
@@ -16,6 +17,10 @@ password = some-pass
 StartTLS = true
 from = me@gmail.com
 to = me@gmail.com
+
+[file]
+enabled = true
+dir = C:\my\dir
 ```
 
 NOTE: task_sendmail supports only unencrypted SMTP connections or SMTP with StartTLS.

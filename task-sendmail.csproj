@@ -40,6 +40,7 @@
     </ItemGroup>
     <ItemGroup>
         <Compile Include="src\AssemblyInfo.cs" />
+        <Compile Include="src\FileReports.cs" />
         <Compile Include="src\IniReader.cs" />
         <Compile Include="src\Logging.cs" />
         <Compile Include="src\ProcessUtil.cs" />
