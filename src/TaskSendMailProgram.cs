@@ -1,12 +1,20 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace TaskSendMail {
   internal static class TaskSendMailProgram {
     public static int Main(string[] args) {
       try {
+        // do not write to console if we don't have it
+        if (!HasConsole()) {
+          Console.SetOut(TextWriter.Null);
+          Console.SetError(TextWriter.Null);
+        }
+
         return MainImpl(args);
       } catch (Exception e) {
         Console.Error.WriteLine(e);
@@ -162,5 +170,10 @@ namespace TaskSendMail {
 
       sender.SendMail($"[task-sendmail] Program '{program}' execution failure: exit code {exitCode}", body);
     }
+
+    private static bool HasConsole() => GetConsoleWindow() != IntPtr.Zero;
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GetConsoleWindow();
   }
 }
