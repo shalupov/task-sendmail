@@ -13,7 +13,7 @@ namespace TaskSendMail {
     }
 
     public void SaveReport(bool success, string body) {
-      var fileName = $"{(success ? "success-" : "failure-")}{DateTime.Now:yyyy-MM-dd-hhmmss}-{Process.GetCurrentProcess().Id}.txt";
+      var fileName = $"{(success ? "success-" : "failure-")}{DateTime.Now:yyyy-MM-dd-HHmmss}-{Process.GetCurrentProcess().Id}.txt";
       var file = Path.Combine(_dir, fileName);
       Logging.Debug("Writing report to: " + file);
       File.WriteAllText(file, body, Encoding.UTF8);
